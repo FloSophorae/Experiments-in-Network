@@ -89,33 +89,18 @@ int sip_recvseg(int connection, seg_t* segPtr){
 	bzero(buffer, sizeof(buffer));
 	int buffer_size = sizeof(seg_t) + 4;
 	int recv_rt = readn(connection, (char*)buffer, buffer_size);
-	
+	if (recv_rt <= 0) return -1;
 	memcpy(segPtr, buffer+2, sizeof(seg_t));
-	if (segPtr != NULL && seglost(segPtr)){
-		//printf("seg lost!\n");
+	if (seglost(segPtr)){
+		printf("seg lost!\n");
 		return -1;
-		//packet lost
 	}
-	if (segPtr != NULL && checkchecksum(segPtr) == -1){
-		//printf("checksum error!\n");
+	else if (checkchecksum(segPtr) == -1){
+		printf("checksum error!\n");
 		return -1;
-		// checksum error
 	}
 	return 1;
 	
-	
-	/*if (seglost()){
-		memcpy(segPtr, buffer + 2, sizeof(seg_t));
-		//printf("\033[31m[ERROR]\033[0m Seg Lost! recvpkt.type: %d\n", ((seg_t*)segPtr)->header.type);
-		return -1;
-	}
-	else {
-		memcpy(segPtr, buffer + 2, sizeof(seg_t));
-  		return 1;
-	}*/
-	
-	//memcpy(segPtr, buffer + 2, sizeof(seg_t));
-  	//return 1;
 }
 
 

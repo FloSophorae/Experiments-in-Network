@@ -168,7 +168,6 @@ void *seghandler(void* arg) {
 	while (1){
 		seg_t recvseg;
 		bzero(&recvseg, sizeof(recvseg));
-		//select(real_tcp_sockfd+1, 0,0,0, NULL);
 		int recv_rt = sip_recvseg(real_tcp_sockfd, &recvseg);
 		if (recv_rt > 0){
 			server_tcb_t* tb = gettcb(recvseg.header.dest_port);
@@ -212,17 +211,17 @@ void *seghandler(void* arg) {
 							ackseg.header.src_port = tb->server_portNum;
 							ackseg.header.dest_port = tb->client_portNum;
 							int ack_rt = sip_sendseg(real_tcp_sockfd, &ackseg);
-							printf("\033[32m[INFO]\033[0m Server: FIN ACK!\n");
+							printf("\033[32m[INFO]\033[0m Server: send FIN ACK!\n");
 							
 							//this's wrong?
-							/*
+							
 							select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
 							tb->state = CLOSED;
 							pthread_mutex_lock(tb->bufMutex);
 							tb->usedBufLen = 0;
 							pthread_mutex_unlock(tb->bufMutex);
 							printf("\033[32m[INFO]\033[0m Server: CLOSED!\n");
-							*/
+							
 						}
 						else if (recvseg.header.type == DATA){
 							pthread_mutex_lock(tb->bufMutex);
@@ -244,6 +243,7 @@ void *seghandler(void* arg) {
 							}
 							else {
 								//printf("stcp-server-seghandler seq_num != expected_seqNum\n");
+								printf("\033[32m[INFO]\033[0m unexpected sequence number!\n");
 								seg_t ackseg;
 								bzero(&ackseg, sizeof(ackseg));
 								ackseg.header.type = DATAACK;
@@ -251,7 +251,7 @@ void *seghandler(void* arg) {
 								ackseg.header.src_port = tb->server_portNum;
 								ackseg.header.dest_port = tb->client_portNum;
 								sip_sendseg(real_tcp_sockfd, &ackseg);
-								printf("\033[32m[INFO]\033[0m Server: DATA ACK Sent!\n");
+								//printf("\033[32m[INFO]\033[0m Server: DATA ACK Sent!\n");
 							}
 							pthread_mutex_unlock(tb->bufMutex);
 						}
@@ -267,7 +267,7 @@ void *seghandler(void* arg) {
 							ackseg.header.src_port = tb->server_portNum;
 							ackseg.header.dest_port = tb->client_portNum;
 							int ack_rt = sip_sendseg(real_tcp_sockfd, &ackseg);
-							printf("\033[32m[INFO]\033[0m Server: FIN ACK!\n");
+							printf("\033[32m[INFO]\033[0m Server: send FIN ACK!\n");
 							select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
 							tb->state = CLOSED;
 							//pthread_mutex_lock(tb->bufMutex);
