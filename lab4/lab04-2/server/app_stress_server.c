@@ -93,7 +93,7 @@ int main() {
 
 	//�����յ����ļ����ݱ��浽�ļ�receivedtext.txt��
 	FILE* f;
-	f = fopen("./receivedtext.txt","a");
+	f = fopen("receivedtext.txt","a");
 	assert(f != NULL);
 	fwrite(buf,fileLen,1,f);
 	fclose(f);

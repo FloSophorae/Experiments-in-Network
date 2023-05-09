@@ -73,13 +73,15 @@ int stcp_client_connect(int sockfd, unsigned int server_port){
     	synseg.header.dest_port = server_port;
     	synseg.header.type = SYN;
 		synseg.header.seq_num = 0;
+		synseg.header.length = 0;
     	int syn_rt = sip_sendseg(real_tcp_sockfd, &synseg);
     	printf("\033[32m[INFO]\033[0m Client: SYN sent!\n");
 		printf("\033[34m[STATE]\033[0m Client: SYNSENT!\n");
     	int retry = SYN_MAX_RETRY;
     	while (retry > 0){
-      		select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = SYN_TIMEOUT/1000});
-      		if (tb->state == CONNECTED){
+      		//select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = SYN_TIMEOUT/1000});
+      		select(0,0,0,0, &(struct timeval){.tv_usec = SYN_TIMEOUT/1000});
+			if (tb->state == CONNECTED){
         		//printf("stcp-client-connect: SYN ACK!\n");
         		return 1;
       		}
@@ -126,6 +128,7 @@ int stcp_client_send(int sockfd, void* data, unsigned int length){
 			pthread_mutex_lock(tb->bufMutex);
 			segbuf->seg.header.seq_num = tb->next_seqNum;
 			tb->next_seqNum += segbuf->seg.header.length;
+			segbuf->sentTime = 0;
 			//printf("\033[31m[INFO]\033[0m Client: next_seqNum: %d\n", tb->next_seqNum);	
 			if (tb->sendBufHead == NULL){
 				tb->sendBufHead = segbuf;
@@ -177,6 +180,7 @@ int stcp_client_disconnect(int sockfd){
     	finseg.header.src_port = tb->client_portNum;
     	finseg.header.dest_port = tb->server_portNum;
     	finseg.header.type = FIN;
+		finseg.header.length = 0;
     	int fin_rt = sip_sendseg(real_tcp_sockfd, &finseg);
     	printf("\033[32m[INFO]\033[0m Client: FIN sent!\n");
 		printf("\033[34m[STATE]\033[0m Client: FINWAIT!\n");
@@ -184,7 +188,7 @@ int stcp_client_disconnect(int sockfd){
     	int retry = FIN_MAX_RETRY;
     	while (retry > 0){
       		select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
-      		if (tb->state == CLOSED){
+			if (tb->state == CLOSED){
 				pthread_mutex_lock(tb->bufMutex);
 				segBuf_t* bufptr = tb->sendBufHead;
 				while (bufptr != tb->sendBufTail){
@@ -197,6 +201,7 @@ int stcp_client_disconnect(int sockfd){
 				tb->sendBufunSent = NULL;
 				tb->sendBufTail = NULL;
 				tb->unAck_segNum = 0;
+				tb->next_seqNum = 0;
 				pthread_mutex_unlock(tb->bufMutex);
         		return 1;
       		}
@@ -222,6 +227,7 @@ int stcp_client_disconnect(int sockfd){
 		tb->sendBufunSent = NULL;
 		tb->sendBufTail = NULL;
 		tb->unAck_segNum = 0;
+		tb->next_seqNum = 0;
 		pthread_mutex_unlock(tb->bufMutex);
     	return -1;
   	}
@@ -246,7 +252,6 @@ void *seghandler(void* arg){
 	while (1){
     	seg_t recvseg;
     	bzero(&recvseg, sizeof(recvseg));
-    	//select(real_tcp_sockfd+1,0,0,0,NULL);
     	int recv_rt = sip_recvseg(real_tcp_sockfd, &recvseg);
     	if (recv_rt > 0){
       		client_tcb_t* tb = gettcb(recvseg.header.dest_port);
@@ -307,11 +312,11 @@ void *seghandler(void* arg){
 void* sendBuf_timer(void* clienttcb){
 	client_tcb_t* tb = (client_tcb_t*)clienttcb;
 	while(1) {
-		select(0,0,0,0,&(struct timeval){.tv_usec = SENDBUF_POLLING_INTERVAL/1000});
+		//select(0,0,0,0,&(struct timeval){.tv_usec = SENDBUF_POLLING_INTERVAL/1000});
+		select(real_tcp_sockfd+1, 0, 0, 0, &(struct timeval){.tv_usec = SENDBUF_POLLING_INTERVAL/1000});
 		struct timeval curtime;
 		gettimeofday(&curtime,NULL);
 		
-		//?ょ??nAck_segNum?0, ?ょ????幻ル?ょ?ょ?ょ???, ?断?.
 		if(tb->unAck_segNum == 0) {
 			pthread_exit(NULL);
 		}

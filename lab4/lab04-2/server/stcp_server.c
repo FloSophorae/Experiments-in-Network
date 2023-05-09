@@ -96,8 +96,6 @@ int stcp_server_accept(int sockfd){
 		printf("\033[34m[STATE]\033[0m Server: Listening!\n");
 		
 		while (1){
-			//select(real_tcp_sockfd+1,0,0,0,NULL);
-			//sleep(1);
 			if (tb->state == CONNECTED) return 1;
 		}
 	}
@@ -116,23 +114,27 @@ int stcp_server_recv(int sockfd, void* buf, unsigned int length){
 	if (tb == NULL) return -1;
 	//printf("\033[34m[DEBUG]\033[0m stcp-server-recv: 1-2\n");
 	if (tb->state == CONNECTED){
+		char* bufptr = buf;
 		//printf("\033[34m[DEBUG]\033[0m stcp-server-recv: 1-3\n");
-		while (1){
+		while (length > 0){
 			//printf("\033[34m[DEBUG]\033[0m stcp-server-recv: 1-4\n");
 			//printf("\033[31m[INFO]\033[0m Server: usedBufLen: %d\n", tb->usedBufLen);
 			//printf("\033[31m[INFO]\033[0m Server: length: %d\n", length);
 			
-			if (tb->usedBufLen >= length){
+			if (tb->usedBufLen != 0){
 				//printf("\033[34m[DEBUG]\033[0m stcp-server-recv: 1-5\n");
 				pthread_mutex_lock(tb->bufMutex);
-				memcpy(buf, tb->recvBuf, length);
+				int cpysize = length > tb->usedBufLen ? tb->usedBufLen : length;
+				memcpy(bufptr, tb->recvBuf, cpysize);
 				//memcpy(tb->recvBuf, &tb->recvBuf[length], tb->usedBufLen - length);
-				memcpy(tb->recvBuf, tb->recvBuf+length, tb->usedBufLen - length);
-				tb->usedBufLen = tb->usedBufLen - length;
+				//memcpy(tb->recvBuf, tb->recvBuf+tb->usedBufLen, tb->usedBufLen - );
+				bufptr += cpysize;
+				length -= cpysize;
+				tb->usedBufLen -= cpysize;
 				pthread_mutex_unlock(tb->bufMutex);
-				return 1;
 			}
 		}
+		return 1;
 	}
 	//printf("\033[34m[DEBUG]\033[0m stcp-server-recv: 1-6\n");
 	return -1;
@@ -188,6 +190,7 @@ void *seghandler(void* arg) {
 							ackseg.header.type = SYNACK;
 							ackseg.header.src_port = tb->server_portNum;
 							ackseg.header.dest_port = tb->client_portNum;
+							ackseg.header.length = 0;
 							int ack_rt = sip_sendseg(real_tcp_sockfd, &ackseg);
 						}
 						break;
@@ -201,6 +204,7 @@ void *seghandler(void* arg) {
 							ackseg.header.type = SYNACK;
 							ackseg.header.src_port = tb->server_portNum;
 							ackseg.header.dest_port = tb->client_portNum;
+							ackseg.header.length = 0;
 							int ack_rt = sip_sendseg(real_tcp_sockfd, &ackseg);
 						}
 						else if (recvseg.header.type == FIN){
@@ -212,12 +216,14 @@ void *seghandler(void* arg) {
 							ackseg.header.type = FINACK;
 							ackseg.header.src_port = tb->server_portNum;
 							ackseg.header.dest_port = tb->client_portNum;
+							ackseg.header.length = 0;
 							int ack_rt = sip_sendseg(real_tcp_sockfd, &ackseg);
-							printf("\033[32m[INFO]\033[0m Server: send FIN ACK!\n");
+							printf("\033[32m[INFO]\033[0m Server: send FINACK!\n");
 							
 							//this's wrong?
 							
-							select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
+							//select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
+							select(0,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
 							tb->state = CLOSED;
 							printf("\033[34m[STATE]\033[0m Server: CLOSED\n");
 							pthread_mutex_lock(tb->bufMutex);
@@ -229,26 +235,27 @@ void *seghandler(void* arg) {
 							pthread_mutex_lock(tb->bufMutex);
 							//printf("\033[31m[INFO]\033[0m Server: seq_num: %d\n", recvseg.header.seq_num);
 							if (recvseg.header.seq_num == tb->expect_seqNum){
-								//printf("stcp-server-seghandler seq_num == expected_seqNum\n");
+								printf("\033[33m[DEBUG]\033[0m expect_seqNum: %d\n", tb->expect_seqNum);
 								memcpy(&tb->recvBuf[tb->usedBufLen], recvseg.data, recvseg.header.length);
 								tb->usedBufLen += recvseg.header.length;
 								tb->expect_seqNum += recvseg.header.length;
-								//printf("\033[33m[DEBUG]\033[0m Server: expect_seqNum: %d\n", tb->expect_seqNum);
 								seg_t ackseg;
 								bzero(&ackseg, sizeof(ackseg));
 								ackseg.header.type = DATAACK;
 								ackseg.header.ack_num = tb->expect_seqNum;
 								ackseg.header.src_port = tb->server_portNum;
 								ackseg.header.dest_port = tb->client_portNum;
+								ackseg.header.length = 0;
 								sip_sendseg(real_tcp_sockfd, &ackseg);
 								//printf("\033[32m[INFO]\033[0m Server: DATA ACK Sent!\n");
 							}
 							else {
 								//printf("stcp-server-seghandler seq_num != expected_seqNum\n");
-								printf("\033[32m[INFO]\033[0m unexpected sequence number!\n");
+								printf("\033[33m[DEBUG]\033[0m unexpected sequence number: %d, but expected: %d\n", recvseg.header.seq_num, tb->expect_seqNum);
 								seg_t ackseg;
 								bzero(&ackseg, sizeof(ackseg));
 								ackseg.header.type = DATAACK;
+								ackseg.header.length = 0;
 								ackseg.header.ack_num = tb->expect_seqNum;
 								ackseg.header.src_port = tb->server_portNum;
 								ackseg.header.dest_port = tb->client_portNum;
@@ -266,11 +273,13 @@ void *seghandler(void* arg) {
 							seg_t ackseg;
 							bzero(&ackseg, sizeof(ackseg));
 							ackseg.header.type = FINACK;
+							ackseg.header.length = 0;
 							ackseg.header.src_port = tb->server_portNum;
 							ackseg.header.dest_port = tb->client_portNum;
 							int ack_rt = sip_sendseg(real_tcp_sockfd, &ackseg);
 							printf("\033[32m[INFO]\033[0m Server: send FINACK!\n");
-							select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
+							//select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
+							select(0,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
 							tb->state = CLOSED;
 							//pthread_mutex_lock(tb->bufMutex);
 							//tb->usedBufLen = 0;

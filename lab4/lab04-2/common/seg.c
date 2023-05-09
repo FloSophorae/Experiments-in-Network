@@ -91,12 +91,15 @@ int sip_recvseg(int connection, seg_t* segPtr){
 	int recv_rt = readn(connection, (char*)buffer, buffer_size);
 	if (recv_rt <= 0) return -1;
 	memcpy(segPtr, buffer+2, sizeof(seg_t));
+	//printf("================================================\n");
+	//char* data = (char*)segPtr;
+	//for (int i )
 	if (seglost(segPtr)){
-		printf("seg lost!\n");
+		printf("\033[31m[ERROR]\033[0m seg lost!\n");
 		return -1;
 	}
 	else if (checkchecksum(segPtr) == -1){
-		printf("checksum error!\n");
+		printf("\033[31m[ERROR]\033[0m checksum error!\n");
 		return -1;
 	}
 	return 1;
@@ -135,23 +138,17 @@ int seglost(seg_t* segPtr) {
 unsigned short checksum(seg_t* segment){
 	segment->header.checksum = 0;
 	long sum = 0;
-	int count = 0;
 	unsigned short * addr = (unsigned short*)segment;
-	if (segment->header.type == SYN || segment->header.type == SYNACK 
-		|| segment->header.type == FIN || segment->header.type == FINACK){
-		count = sizeof(stcp_hdr_t);
-	}
-	else {
-		count = sizeof(stcp_hdr_t) + segment->header.length;
-	}
+	int count = sizeof(stcp_hdr_t) + segment->header.length;
 	while (count > 0){
 		sum += *(unsigned short*)addr++;
 		count -= 2;
 	}
 	if (count > 0){
-		unsigned char leftover[2] = {0};
-		leftover[1] = *addr;
-		sum += *(unsigned short*)leftover;
+		//unsigned char leftover[2] = {0};
+		//leftover[1] = *addr;
+		//sum += *(unsigned short*)leftover;
+		sum += *(unsigned char*)addr;
 	}
 	while (sum >> 16){
 		sum = (sum & 0xffff) + (sum >> 16);
@@ -163,23 +160,17 @@ unsigned short checksum(seg_t* segment){
 //这个函数检查段中的校验和, 正确时返回1, 错误时返回-1
 int checkchecksum(seg_t* segment){
 	long sum = 0;
-	int count = 0;
 	unsigned short * addr = (unsigned short*)segment;
-	if (segment->header.type == SYN || segment->header.type == SYNACK 
-		|| segment->header.type == FIN || segment->header.type == FINACK){
-		count = sizeof(stcp_hdr_t);
-	}
-	else {
-		count = sizeof(stcp_hdr_t) + segment->header.length;
-	}
+	int count = sizeof(stcp_hdr_t) + segment->header.length;
 	while (count > 0){
 		sum += *(unsigned short*)addr++;
 		count -= 2;
 	}
 	if (count > 0){
-		unsigned char leftover[2] = {0};
-		leftover[1] = *addr;
-		sum += *(unsigned short*)leftover;
+		//unsigned char leftover[2] = {0};
+		//leftover[1] = *addr;
+		//sum += *(unsigned short*)leftover;
+		sum += *(unsigned char*)addr;
 	}
 	while (sum >> 16){
 		sum = (sum & 0xffff) + (sum >> 16);
