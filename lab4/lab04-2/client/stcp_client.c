@@ -75,6 +75,7 @@ int stcp_client_connect(int sockfd, unsigned int server_port){
 		synseg.header.seq_num = 0;
     	int syn_rt = sip_sendseg(real_tcp_sockfd, &synseg);
     	printf("\033[32m[INFO]\033[0m Client: SYN sent!\n");
+		printf("\033[34m[STATE]\033[0m Client: SYNSENT!\n");
     	int retry = SYN_MAX_RETRY;
     	while (retry > 0){
       		select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = SYN_TIMEOUT/1000});
@@ -92,6 +93,7 @@ int stcp_client_connect(int sockfd, unsigned int server_port){
     	//printf("stcp-client-connect: RETRY EXCEED!\n");
     	printf("\033[31m[ERROR]\033[0m Client: SYN Retry exceed!\n");
     	tb->state = CLOSED;
+		printf("\033[34m[STATE]\033[0m Client: CLOSED\n");
     	return -1;
   	}
   	return -1;
@@ -177,6 +179,7 @@ int stcp_client_disconnect(int sockfd){
     	finseg.header.type = FIN;
     	int fin_rt = sip_sendseg(real_tcp_sockfd, &finseg);
     	printf("\033[32m[INFO]\033[0m Client: FIN sent!\n");
+		printf("\033[34m[STATE]\033[0m Client: FINWAIT!\n");
     	tb->state = FINWAIT;
     	int retry = FIN_MAX_RETRY;
     	while (retry > 0){
@@ -206,6 +209,7 @@ int stcp_client_disconnect(int sockfd){
     	//retry times exceed
     	printf("\033[31m[ERROR]\033[0m Client: FIN retry exceed!\n");
     	tb->state = CLOSED;
+		printf("\033[34m[STATE]\033[0m Client: CLOSED!\n");
 		pthread_mutex_lock(tb->bufMutex);
 		segBuf_t* bufptr = tb->sendBufHead;
 		while (bufptr != tb->sendBufTail){
@@ -249,11 +253,13 @@ void *seghandler(void* arg){
       		if (tb != NULL){
         		if (tb->state == SYNSENT && recvseg.header.type == SYNACK){
           			tb->state = CONNECTED;
-          			printf("\033[32m[INFO]\033[0m Client: SYN ACK!\n");
+          			printf("\033[32m[INFO]\033[0m Client: receive SYNACK!\n");
+					printf("\033[34m[STATE]\033[0m Client: CONNECTED\n");
         		}
         		else if (tb->state == FINWAIT && recvseg.header.type == FINACK){
           			tb->state = CLOSED;
-          			printf("\033[32m[INFO]\033[0m Client: FIN ACK!\n");
+					printf("\033[32m[INFO]\033[0m Client: receive FINACK!\n");
+					printf("\033[34m[STATE]\033[0m Client: CLOSED\n");
         		}
 				else if (tb->state == CONNECTED && recvseg.header.type == DATAACK && tb->client_portNum == recvseg.header.dest_port){
 					//receive DATA ACK

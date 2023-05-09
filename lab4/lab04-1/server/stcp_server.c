@@ -84,7 +84,7 @@ int stcp_server_accept(int sockfd) {
 	if (tb == NULL) return -1;
 	if (tb->state == CLOSED){
 		tb->state = LISTENING;
-		printf("\033[32m[INFO]\033[0m Server: Listening!\n");
+		printf("\033[34m[STATE]\033[0m Server: Listening!\n");
 		
 		while (1){
 			//select(real_tcp_sockfd+1,0,0,0,NULL);
@@ -144,6 +144,7 @@ void *seghandler(void* arg) {
 							tb->state = CONNECTED;
 							tb->client_portNum = recvseg.header.src_port;
 							printf("\033[32m[INFO]\033[0m Server: recvive SYN!\n");
+							printf("\033[34m[STATE]\033[0m Server: CONNECTED\n");
 							seg_t ackseg;
 							bzero(&ackseg, sizeof(ackseg));
 							ackseg.header.type = SYNACK;
@@ -157,6 +158,7 @@ void *seghandler(void* arg) {
 						if (recvseg.header.type == SYN){
 							tb->state = CONNECTED;
 							printf("\033[32m[INFO]\033[0m Server: recvive SYN!\n");
+							
 							seg_t ackseg;
 							bzero(&ackseg, sizeof(ackseg));
 							ackseg.header.type = SYNACK;
@@ -167,6 +169,7 @@ void *seghandler(void* arg) {
 						else if (recvseg.header.type == FIN){
 							tb->state = CLOSEWAIT;
 							printf("\033[32m[INFO]\033[0m Server: recvive FIN!\n");
+							printf("\033[34m[STATE]\033[0m Server: CLOSEWAIT\n");
 							seg_t ackseg;
 							bzero(&ackseg, sizeof(ackseg));
 							ackseg.header.type = FINACK;
@@ -177,7 +180,7 @@ void *seghandler(void* arg) {
 							//this's wrong?
 							select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
 							tb->state = CLOSED;
-							printf("\033[32m[INFO]\033[0m Server: CLOSED!\n");
+							printf("\033[34m[STATE]\033[0m Server: CLOSED\n");
 						}
 						break;
 					}
@@ -193,7 +196,7 @@ void *seghandler(void* arg) {
 							int ack_rt = sip_sendseg(real_tcp_sockfd, &ackseg);
 							select(real_tcp_sockfd+1,0,0,0, &(struct timeval){.tv_usec = FIN_TIMEOUT/1000});
 							tb->state = CLOSED;
-							printf("\033[32m[INFO]\033[0m Server: CLOSED!\n");
+							printf("\033[34m[STATE]\033[0m Server: CLOSED\n");
 						}
 						break;
 					}
